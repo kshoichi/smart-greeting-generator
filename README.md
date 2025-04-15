@@ -7,7 +7,7 @@ A highly customizable Home Assistant script that creates dynamic, context-aware 
 - **Time-of-day greetings**: Morning, afternoon, evening, early morning, and late night.
 - **Specific-day greetings**: Custom greetings for holidays or special dates (e.g. "12-25" for Christmas).
 - **Weekday-specific messages**: Unique greetings for each day of the week.
-- **"Been a while" detection**: Adds a special message if it’s been more than 24 hours since your last notification.
+- **"Been a while" detection**: Adds a special message if it’s been more than 48 hours since your last notification.
 - **Cooldowns**: Prevents overuse of greeting types by defining time-based cooldowns.
 - **Rotation tracking**: Keeps greetings fresh by avoiding repetition.
 - **Randomization**: Introduces chance-based weekday messages so they're not always predictable.
@@ -36,7 +36,7 @@ The script supports:
 ### Cooldown Settings (in seconds)
 ```yaml
 base_greeting_cooldown: 21600   # 6 hours
-extra_greeting_cooldown: 86400  # 24 hours
+extra_greeting_cooldown: 172,800  # 48 hours
 ```
 
 ### Specific Day Greetings
