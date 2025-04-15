@@ -36,7 +36,7 @@ The script supports:
 ### Cooldown Settings (in seconds)
 ```yaml
 base_greeting_cooldown: 21600   # 6 hours
-extra_greeting_cooldown: 172,800  # 48 hours
+extra_greeting_cooldown: 172800  # 48 hours
 ```
 
 ### Specific Day Greetings
