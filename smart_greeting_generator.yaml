@@ -1,0 +1,203 @@
+alias: smart_greeting_generator
+sequence:
+  - variables:
+      # === Configuration: Cooldowns (in seconds) ===
+      base_greeting_cooldown: 21600   # 6 hours
+      extra_greeting_cooldown: 86400  # 24 hours
+
+      # === Specific day greeting pool ===
+      specific_day_greetings:
+        "01-01":
+          - "Happy New Year!"
+          - "Wishing you a fresh start!"
+        "07-04":
+          - "Happy 4th of July!"
+          - "Celebrate freedom!"
+        "10-31":
+          - "Happy Halloween!"
+          - "Stay spooky!"
+        "12-25":
+          - "Merry Christmas!"
+          - "Hope your holidays are bright!"
+
+      # === Weekday greeting pools ===
+      weekday_pools:
+        monday:
+          - "Happy Monday!"
+          - "Let’s start the week strong!"
+          - "Hope your Monday’s off to a good start!"
+        tuesday:
+          - "Happy Tuesday!"
+          - "Keep the momentum going!"
+          - "It’s Tuesday already?"
+        wednesday:
+          - "Happy Hump Day!"
+          - "You’re halfway there!"
+          - "Midweek motivation!"
+        thursday:
+          - "Happy Thursday!"
+          - "The weekend’s in sight!"
+          - "Hope your Thursday’s treating you well!"
+        friday:
+          - "Happy Friday!"
+          - "TGIF!"
+          - "It’s finally Friday!"
+        saturday:
+          - "Happy Saturday!"
+          - "Enjoy your weekend!"
+          - "It’s Saturday, take it easy!"
+        sunday:
+          - "Happy Sunday!"
+          - "Recharge and relax!"
+          - "Sunday vibes only."
+
+      # === Extra greeting pool ===
+      extra_pool:
+        - "Hey, it's been a while."
+        - "Long time no hear!"
+        - "Good to see you again!"
+        - "It's been a minute!"
+        - "Hey stranger."
+        - "Welcome back!"
+
+      # === Runtime Variables ===
+      now_ts: "{{ now().timestamp() }}"
+      last_ts: "{{ as_timestamp(states('input_datetime.last_notification_time')) }}"
+      elapsed: "{{ now_ts - last_ts }}"
+      hour: "{{ now().hour }}"
+      day_name: "{{ now().strftime('%A') | lower }}"
+      today: "{{ now().date().isoformat() }}"
+      today_key: "{{ now().strftime('%m-%d') }}"
+      last_weekday_day: "{{ states('input_text.last_weekday_greeting_day') }}"
+      roll: "{{ range(1, 4) | random }}"
+
+      # === Time-based greeting pools ===
+      late_night_pool:
+        - "You're up late!"
+        - "Still awake, huh?"
+        - "Hope everything's okay tonight."
+      early_morning_pool:
+        - "Up bright and early!"
+        - "Early bird gets the worm!"
+        - "Good morning, early riser!"
+      morning_pool:
+        - "Good morning!"
+        - "Rise and shine!"
+        - "Top of the morning to you!"
+        - "Hope you slept well!"
+      afternoon_pool:
+        - "Good afternoon!"
+        - "Hope your day's going well!"
+        - "Hello there!"
+        - "Nice to see you!"
+      evening_pool:
+        - "Good evening!"
+        - "Hope you had a good day!"
+        - "Evening, friend!"
+        - "Relax and unwind!"
+
+      base_pool: >
+        {% if hour < 4 %}
+          {{ late_night_pool }}
+        {% elif hour < 8 %}
+          {{ early_morning_pool }}
+        {% elif hour < 12 %}
+          {{ morning_pool }}
+        {% elif hour < 18 %}
+          {{ afternoon_pool }}
+        {% else %}
+          {{ evening_pool }}
+        {% endif %}
+
+      base_used: "{{ states('input_text.used_base_greetings').split(',') if states('input_text.used_base_greetings') else [] }}"
+      base_filtered: "{{ base_pool | select('string') | reject('in', base_used) | list }}"
+      base_greeting: >
+        {% if elapsed > base_greeting_cooldown %}
+          {{ base_filtered | random if base_filtered else base_pool | random }}
+        {% else %}
+          ""
+        {% endif %}
+
+      updated_base: >
+        {% if elapsed > base_greeting_cooldown %}
+          {% set updated = base_used + [base_greeting] %}
+          {% set deduped = updated | unique | list %}
+          {% if deduped | length >= base_pool | length %}
+            ""
+          {% else %}
+            {{ deduped | join(',') }}
+          {% endif %}
+        {% else %}
+          {{ states('input_text.used_base_greetings') }}
+        {% endif %}
+
+      extra_used: "{{ states('input_text.used_extra_greetings').split(',') if states('input_text.used_extra_greetings') else [] }}"
+      extra_filtered: "{{ extra_pool | select('string') | reject('in', extra_used) | list }}"
+      extra_greeting: >
+        {% if elapsed > extra_greeting_cooldown %}
+          {{ extra_filtered | random if extra_filtered else extra_pool | random }}
+        {% else %}
+          ""
+        {% endif %}
+
+      updated_extra: >
+        {% if elapsed > extra_greeting_cooldown %}
+          {% set updated = extra_used + [extra_greeting] %}
+          {% set deduped = updated | unique | list %}
+          {% if deduped | length >= extra_pool | length %}
+            ""
+          {% else %}
+            {{ deduped | join(',') }}
+          {% endif %}
+        {% else %}
+          {{ states('input_text.used_extra_greetings') }}
+        {% endif %}
+
+      # === Specific day greeting ===
+      specific_day_greeting: >
+        {% set pool = specific_day_greetings[today_key] if today_key in specific_day_greetings else [] %}
+        {{ pool | random if pool else '' }}
+
+      # === Weekday greeting ===
+      weekday_greeting: >
+        {% set pool = weekday_pools[day_name] %}
+        {% if today != last_weekday_day and roll == 1 and pool %}
+          {{ pool | random }}
+        {% else %}
+          ""
+        {% endif %}
+
+      # === Final greeting combination ===
+      full_greeting: >
+        {% set parts = [specific_day_greeting, extra_greeting, weekday_greeting, base_greeting] %}
+        {{ parts | select('string') | reject('equalto', '') | join(' ') | trim }}
+
+  - service: input_text.set_value
+    data:
+      entity_id: input_text.latest_notification_greeting
+      value: >
+        {% set clean = full_greeting | replace('"', '') | trim %}
+        {{ "" if clean == "" else clean }}
+
+  - service: input_text.set_value
+    data:
+      entity_id: input_text.used_base_greetings
+      value: "{{ updated_base }}"
+
+  - service: input_text.set_value
+    data:
+      entity_id: input_text.used_extra_greetings
+      value: "{{ updated_extra }}"
+
+  - service: input_datetime.set_datetime
+    data:
+      entity_id: input_datetime.last_notification_time
+      datetime: "{{ now().isoformat() }}"
+
+  - condition: template
+    value_template: "{{ weekday_greeting | trim != '' }}"
+
+  - service: input_text.set_value
+    data:
+      entity_id: input_text.last_weekday_greeting_day
+      value: "{{ today }}"
