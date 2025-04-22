@@ -95,6 +95,7 @@ action:
 ## 📁 File Overview
 
 - `smart_greeting_generator.yaml` – The main script
+- `smart_greeting_notify.yaml` – A helper script to streamline notifications
 - `README.md` – You are here
 
 ---
