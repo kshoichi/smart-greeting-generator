@@ -1,0 +1,30 @@
+alias: smart_greeting_notify
+mode: single
+fields:
+  message_body:
+    name: Message Body
+    description: Main content of the notification
+    required: true
+  title:
+    name: Notification Title
+    description: Optional title for the notification
+    required: false
+sequence:
+  - action: script.smart_greeting_generator
+    data: {}
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 0
+      milliseconds: 500
+  - variables:
+      greeting: "{{ states('input_text.latest_notification_greeting') | trim }}"
+      message_clean: "{{ message_body | default('') | trim }}"
+      title_clean: "{{ title | default('Smart Notification') | trim }}"
+      final_message: >
+        {{ [greeting, message_clean] | select('string') | reject('equalto', '')
+        | join(' ') | trim }}
+  - data:
+      title: "{{ title_clean }}"
+      message: "{{ final_message }}"
+    action: notify.mobile_app_benphone
